@@ -185,7 +185,7 @@ class DiskSample(object):
              mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
         # X-axis
         ax[2][0].set_xscale('log')
-        ax[2][0].set_xlabel(r'M$_d$/M$_\Earth$')
+        ax[2][0].set_xlabel(r'M$_d$/M$_\oplus$')
         ax[2][0].set_xlim(mymdrange[0],mymdrange[1])
         # Y-axis
         ax[2][0].set_ylabel(r'T$_{mm}$ (K)')
