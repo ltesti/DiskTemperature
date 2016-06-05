@@ -133,6 +133,54 @@ class DiskSample(object):
 
     def write_table(self, outfile):
         self.mytable.write(outfile,format='ascii.ipac')
+
+    def do_LR_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(15,5), ax='None', myyrange=[12.,1000.], myxrange=[0.03,4.]):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f, ax = plt.subplots(1, 2, figsize=fsiz)
+
+        myxrout = self.mytable['Lstar']**0.25/self.mytable['R_out_50']**0.5
+        myxrc = self.mytable['Lstar']**0.25/self.mytable['Rc_50']**0.5
+
+        # Plot for Rout
+        ax[0].errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Tmm_50']/myxrout[self.nval],
+             yerr=[self.mytable[self.nval]['Tmm_em']/myxrout[self.nval],self.mytable[self.nval]['Tmm_ep']/myxrout[self.nval]], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        ax[0].errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Tmm_50']/myxrout[self.ninval],
+             yerr=[self.mytable[self.ninval]['Tmm_em']/myxrout[self.ninval],self.mytable[self.ninval]['Tmm_ep']/myxrout[self.ninval]], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        ax[0].set_xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        ax[0].set_xlabel(r'M$_\star$/M$_\odot$')
+        ax[0].set_xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        ax[0].set_ylabel(r'(T$_{mm}$/K)/((L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$)')
+        ax[0].set_yscale('log')
+        ax[0].set_ylim(myyrange[0],myyrange[1])
+
+        # Plot for Rc
+        ax[1].errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Tmm_50']/myxrc[self.nval],
+             yerr=[self.mytable[self.nval]['Tmm_em']/myxrc[self.nval],self.mytable[self.nval]['Tmm_ep']/myxrc[self.nval]], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        ax[1].errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Tmm_50']/myxrc[self.ninval],
+             yerr=[self.mytable[self.ninval]['Tmm_em']/myxrc[self.ninval],self.mytable[self.ninval]['Tmm_ep']/myxrc[self.ninval]], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        ax[1].set_xscale('log')
+        ax[1].set_xlabel(r'M$_\star$/M$_\odot$')
+        ax[1].set_xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        ax[1].set_ylabel(r'(T$_{mm}$/K)/((L$_\star$/L$_\odot$)$^{0.25}/$(R$_c$/AU)$^{0.5}$)')
+        ax[1].set_yscale('log')
+        ax[1].set_ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f, ax 
+        else:
+            return 0
         
     def do_6_par_plot(self, ax='None', newfig=True, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, 
                       mytrange=[6.,200.], mygrange=[-1.8,2.], mylrange=[0.006,110.], mymsrange=[0.05,4.],
