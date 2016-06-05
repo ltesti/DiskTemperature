@@ -3,7 +3,7 @@ import scipy.optimize as so
 import matplotlib.pyplot as plt
 import astropy.io.ascii as aio
 import astropy.units as u
-
+from astropy.analytic_functions import blackbody_nu
 
 #
 # Clase che definisce la singola stella
@@ -104,6 +104,7 @@ class DiskSample(object):
         self.stars = []
         [self.stars.append(Disk(row)) for row in self.mytable]
         self.nstars = len(self.stars)
+        self.fill_err_cols()
         self.fill_tmm_cols()
         self.nval = np.where(self.mytable['Valid'] == 1 )
         self.ninval = np.where(self.mytable['Valid'] == 0 )
@@ -111,7 +112,31 @@ class DiskSample(object):
     def __str__(self):
         rep = "Table of Disk observed and fitted properties, read from file %s containing %d objects (%d validated)" % (self.original_file,self.nstars,len(self.nval[0]))
         return rep
-        
+    
+    def fill_err_cols(self):  
+        rom=[]
+        rop=[]
+        rcm=[]
+        rcp=[]
+        for i in range(self.nstars):
+            if (self.mytable[i]['Rc_16'] > self.mytable[i]['Rc_84']):
+                rcp.append(self.mytable[i]['Rc_16']-self.mytable[i]['Rc_50'])
+                rcm.append(self.mytable[i]['Rc_50']-self.mytable[i]['Rc_84'])
+            else:
+                rcm.append(-self.mytable[i]['Rc_16']+self.mytable[i]['Rc_50'])
+                rcp.append(-self.mytable[i]['Rc_50']+self.mytable[i]['Rc_84'])
+        for i in range(self.nstars):
+            if (self.mytable[i]['R_out_16'] > self.mytable[i]['R_out_84']):
+                rop.append(self.mytable[i]['R_out_16']-self.mytable[i]['R_out_50'])
+                rom.append(self.mytable[i]['R_out_50']-self.mytable[i]['R_out_84'])
+            else:
+                rom.append(-self.mytable[i]['R_out_16']+self.mytable[i]['R_out_50'])
+                rop.append(-self.mytable[i]['R_out_50']+self.mytable[i]['R_out_84'])
+        self.mytable['R_out_ep'] = rop
+        self.mytable['R_out_em'] = rom
+        self.mytable['Rc_ep'] = rcp
+        self.mytable['Rc_em'] = rcm
+
     def fill_tmm_cols(self):
         a=[]
         b=[]
@@ -125,6 +150,9 @@ class DiskSample(object):
             if (self.stars[i].tmm_16 > self.stars[i].tmm_84):
                 d.append(self.stars[i].tmm_16-self.stars[i].tmm)
                 e.append(self.stars[i].tmm-self.stars[i].tmm_84)
+            else:
+                e.append(-self.stars[i].tmm_16+self.stars[i].tmm)
+                d.append(-self.stars[i].tmm+self.stars[i].tmm_84)
         self.mytable['Tmm_16'] = b * u.K
         self.mytable['Tmm_50'] = a * u.K
         self.mytable['Tmm_84'] = c * u.K
@@ -133,6 +161,145 @@ class DiskSample(object):
 
     def write_table(self, outfile):
         self.mytable.write(outfile,format='ascii.ipac')
+
+    #
+    # Computes the Tlt temperature
+    def calc_tlt(self,tmed):
+        #
+        self.mytable['Tlt'] = tmed*(self.mytable['Lstar']/self.mytable['Mstar'])**0.25 * u.K
+
+    #
+    # Computes the Tlt temperature
+    def calc_ta(self):
+        #
+        self.mytable['Ta'] = 25.*(self.mytable['Lstar'])**0.25 * u.K
+        self.mytable['Tvdp'] = 22.*(self.mytable['Lstar'])**0.16 * u.K
+
+    #
+    # Computes the md (and uncertainties) using the Tlt, Ta temperatures 
+    def calc_md_tlt(self, nu = 340.*u.GHz, k340 = 3.4):
+        self.boltz_tlt = np.ones(self.nstars)
+        self.boltz_ta = np.ones(self.nstars)
+        self.boltz_tvdp = np.ones(self.nstars)
+        for i in range(self.nstars):
+            self.boltz_tlt[i] = blackbody_nu(nu, self.mytable[i]['Tlt']).value
+            self.boltz_ta[i] = blackbody_nu(nu, self.mytable[i]['Ta']).value
+            self.boltz_tvdp[i] = blackbody_nu(nu, self.mytable[i]['Tvdp']).value
+        self.boltz_20k = blackbody_nu(nu, 20. * u.K).value
+        # pc = 3.0857e18 cm
+        # mJy = 1.e-26  erg /s/cm2/Hz
+        # mE = 5.9722e27 g
+        # k340 =3.4
+        # k = mJy*pc*pc/mE = 1.594311e-17
+        mfunc_k = 1.594311e-17/k340
+        self.mlt = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt
+        self.mta = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta
+        self.mtvdp = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tvdp
+        self.m20k = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k
+
+    def do_LM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(8,6), f='None', myyrange=[2.,1000.], myxrange=[0.03,4.]):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f = plt.figure(figsize=fsiz)
+
+        myxlm = (self.mytable['Lstar']/self.mytable['Mstar'])**0.25
+
+        # Plot for Rout
+        plt.errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Tmm_50']/myxlm[self.nval],
+             yerr=[self.mytable[self.nval]['Tmm_em']/myxlm[self.nval],self.mytable[self.nval]['Tmm_ep']/myxlm[self.nval]], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Tmm_50']/myxlm[self.ninval],
+             yerr=[self.mytable[self.ninval]['Tmm_em']/myxlm[self.ninval],self.mytable[self.ninval]['Tmm_ep']/myxlm[self.ninval]], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+
+        # compute median, plot and annotate
+        mymed = np.median(self.mytable[self.nval]['Tmm_50']/myxlm[self.nval])
+        plt.plot(myxrange,[mymed,mymed],linestyle='dashed',color=mycolor)
+        xl = myxrange[0]+(myxrange[1]-myxrange[0])*0.005
+        yl = myyrange[1]-(myyrange[1]-myyrange[0])*0.2
+        mylab = "Median = %5.2f" % (mymed)
+        plt.text(xl,yl,mylab)
+        
+        # Y-axis
+        plt.xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        plt.xlabel(r'M$_\star$/M$_\odot$')
+        plt.xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        plt.ylabel(r'(T$_{mm}$/K)/((L$_\star$/L$_\odot$)/(M$_\star$/M$_\odot$))$^{0.25}$')
+        plt.yscale('log')
+        plt.ylim(myyrange[0],myyrange[1])
+
+        # Plot for Rc
+        #ax[1].errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Rc_50']/self.mytable[self.nval]['Mstar']**0.5,
+        #     yerr=[self.mytable[self.nval]['Rc_em'],self.mytable[self.nval]['Rc_ep']], 
+        #     fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        #ax[1].errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Rc_50']/self.mytable[self.ninval]['Mstar']**0.5,
+        #     yerr=[self.mytable[self.ninval]['Rc_em'],self.mytable[self.ninval]['Rc_ep']], 
+        #     mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        #ax[1].set_xscale('log')
+        #ax[1].set_xlabel(r'M$_\star$/M$_\odot$')
+        #ax[1].set_xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        #ax[1].set_ylabel(r'(R$_c$/AU)/(M$_\star$/M$_\odot$)$^{0.5}$')
+        #ax[1].set_yscale('log')
+        #ax[1].set_ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f
+        else:
+            return 0
+
+    def do_RM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(15,5), ax='None', myyrange=[2.,1000.], myxrange=[0.03,4.]):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f, ax = plt.subplots(1, 2, figsize=fsiz)
+
+        #myxrout = self.mytable['Lstar']**0.25/self.mytable['R_out_50']**0.5
+        #myxrc = self.mytable['Lstar']**0.25/self.mytable['Rc_50']**0.5
+
+        # Plot for Rout
+        ax[0].errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['R_out_50']/self.mytable[self.nval]['Mstar']**0.5,
+             yerr=[self.mytable[self.nval]['R_out_em'],self.mytable[self.nval]['R_out_ep']], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        ax[0].errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['R_out_50']/self.mytable[self.ninval]['Mstar']**0.5,
+             yerr=[self.mytable[self.ninval]['R_out_em'],self.mytable[self.ninval]['R_out_ep']], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        ax[0].set_xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        ax[0].set_xlabel(r'M$_\star$/M$_\odot$')
+        ax[0].set_xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        ax[0].set_ylabel(r'(R$_{out}$/AU)/(M$_\star$/M$_\odot$)$^{0.5}$')
+        ax[0].set_yscale('log')
+        ax[0].set_ylim(myyrange[0],myyrange[1])
+
+        # Plot for Rc
+        ax[1].errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Rc_50']/self.mytable[self.nval]['Mstar']**0.5,
+             yerr=[self.mytable[self.nval]['Rc_em'],self.mytable[self.nval]['Rc_ep']], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        ax[1].errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Rc_50']/self.mytable[self.ninval]['Mstar']**0.5,
+             yerr=[self.mytable[self.ninval]['Rc_em'],self.mytable[self.ninval]['Rc_ep']], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        ax[1].set_xscale('log')
+        ax[1].set_xlabel(r'M$_\star$/M$_\odot$')
+        ax[1].set_xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        ax[1].set_ylabel(r'(R$_c$/AU)/(M$_\star$/M$_\odot$)$^{0.5}$')
+        ax[1].set_yscale('log')
+        ax[1].set_ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f, ax 
+        else:
+            return 0
 
     def do_LR_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
                    fsiz=(15,5), ax='None', myyrange=[12.,1000.], myxrange=[0.03,4.]):
