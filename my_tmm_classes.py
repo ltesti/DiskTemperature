@@ -193,9 +193,15 @@ class DiskSample(object):
         # k = mJy*pc*pc/mE = 1.594311e-17
         mfunc_k = 1.594311e-17/k340
         self.mlt = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt
+        self.mlt_ep = mfunc_k * (self.mytable['F_cont'] + self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt - self.mlt
+        self.mlt_em = self.mlt - mfunc_k * (self.mytable['F_cont'] - self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt
         self.mta = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta
+        self.mta_ep = mfunc_k * (self.mytable['F_cont'] + self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta + self.mta
+        self.mta_em = self.mta - mfunc_k * (self.mytable['F_cont'] - self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta
         self.mtvdp = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tvdp
         self.m20k = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k
+        self.m20k_ep = mfunc_k * (self.mytable['F_cont'] + self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k + self.m20k
+        self.m20k_em = self.m20k - mfunc_k * (self.mytable['F_cont'] - self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k
 
     def do_LM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
                    fsiz=(8,6), f='None', myyrange=[2.,1000.], myxrange=[0.03,4.]):
