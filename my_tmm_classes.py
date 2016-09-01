@@ -418,6 +418,52 @@ class DiskSample(object):
         else:
             return 0
 
+    def do_aF_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(8,6), ax='None', myyrange=[10.,300.], myxrange=[0.1,1000.], dolabel=True):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f = plt.figure(figsize=fsiz)
+
+        myxra = np.copy(self.mytable['Lstar']**0.25)
+        for i in range(len(myxra)):
+            if self.mytable['a'][i]!='...':
+                myxra[i] = myxra[i]/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5
+            else:
+                myxra[i] = 1.e5
+
+        ngra = np.where(myxra[self.nval] < 1.e5)
+        self.Tlt_ruvg = np.median((self.mytable[self.nval]['Tmm_50']/myxra[self.nval])[ngra])
+
+        # Plot for Rout
+        plt.errorbar(self.mytable[self.nval]['F_cont'],self.mytable[self.nval]['Tmm_50']/myxra[self.nval],
+             yerr=[self.mytable[self.nval]['Tmm_em']/myxra[self.nval],self.mytable[self.nval]['Tmm_ep']/myxra[self.nval]], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.errorbar(self.mytable[self.ninval]['F_cont'],self.mytable[self.ninval]['Tmm_50']/myxra[self.ninval],
+             yerr=[self.mytable[self.ninval]['Tmm_em']/myxra[self.ninval],self.mytable[self.ninval]['Tmm_ep']/myxra[self.ninval]], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.plot([myxrange[0],myxrange[1]],[self.Tlt_ruvg,self.Tlt_ruvg],linestyle='dotted',color='k')
+        mylab = "Median = %5.2f" % (self.Tlt_ruvg)
+        xl = myxrange[0]+(myxrange[1]-myxrange[0])*0.005
+        yl = myyrange[0]+(myyrange[1]-myyrange[0])*0.01
+        if dolabel:
+            plt.text(xl,yl,mylab)
+        # Y-axis
+        plt.xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        plt.xlabel(r'F$_{890\mu m}$')
+        plt.xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        plt.ylabel(r'(T$_{mm}$/K)/((L$_\star$/L$_\odot$)$^{0.25}/$(R$_{uvg}$/AU)$^{0.5}$)')
+        plt.yscale('log')
+        plt.ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f 
+        else:
+            return 0
+
+
     def do_RM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
                    fsiz=(15,5), ax='None', myyrange=[2.,1000.], myxrange=[0.03,4.]):
         marksiz=mymarksiz
