@@ -9,44 +9,37 @@ from astropy.analytic_functions import blackbody_nu
 # Clase che definisce la singola stella
 class Disk(object):
 
-    def __init__(self, tabrow):
+    def __init__(self, tabrow, full_table=True, tab_fmt='lupus'):
         #
-        self.star_id = tabrow['ID']
-        self.star_name = tabrow['Name']
-        self.dist = tabrow['Dist']
-        self.teff = tabrow['Teff']
-        self.lstar = tabrow['Lstar']
+        self.tabrow = tabrow
+        self.star_id = self.tabrow['ID']
+        self.star_name = self.tabrow['Name']
+        self.dist = self.tabrow['Dist']
+        self.teff = self.tabrow['Teff']
+        self.lstar = self.tabrow['Lstar']
         self.llstar = np.log10(self.lstar)
-        self.mstar = tabrow['Mstar']
+        self.mstar = self.tabrow['Mstar']
         self.lmstar = np.log10(self.mstar)
-        self.rout = tabrow['R_out_50']
-        self.rout_16 = tabrow['R_out_16']
-        self.rout_84 = tabrow['R_out_84']
-        self.mdust = tabrow['M_dust_50']
-        self.mdust_16 = tabrow['M_dust_16']
-        self.mdust_84 = tabrow['M_dust_84']
-        self.gamma = tabrow['gamma_50']
-        self.gamma_16 = tabrow['gamma_16']
-        self.gamma_84 = tabrow['gamma_84']
-        self.rc = tabrow['Rc_50']
-        self.rc_16 = tabrow['Rc_16']
-        self.rc_84 = tabrow['Rc_84']
-        self.sigma0 = tabrow['sigma0_50']
-        self.sigma0_16 = tabrow['sigma0_16']
-        self.sigma0_84 = tabrow['sigma0_84']
-        self.inc = tabrow['inc_50']
-        self.inc_16 = tabrow['inc_16']
-        self.inc_84 = tabrow['inc_84']
-        self.fcont = tabrow['F_cont']
-        self.efcont = tabrow['E_cont']
-        self.i = tabrow['i']
-        self.ei = tabrow['e_i']
-        self.mdust_ansdell = tabrow['M_dust']
-        if tabrow['Valid'] == 1:
-            self.valid = True 
-        else:
-            self.valid = False
+        self.fcont = self.tabrow['F_cont']
+        self.efcont = self.tabrow['E_cont']
         #
+        if tab_fmt == 'lupus':
+            self.read_marco_fit_params()
+            self.read_lupus_ansdell_pars()
+        if tab_fmt == 'bds':
+            self.read_marco_fit_params()
+            self.read_bds_pars()
+            k_fact=1. #200./337.
+            self.mdust = self.mdust*k_fact
+            self.mdust_16 = self.mdust_16*k_fact
+            self.mdust_84 = self.mdust_84*k_fact
+            self.sigma0 = self.sigma0*k_fact
+            self.sigma0_16 = self.sigma0_16*k_fact
+            self.sigma0_84 = self.sigma0_84*k_fact
+            self.mdust_testi = self.mdust_testi*k_fact
+        self.compute_tmm()
+
+    def compute_tmm(self):
         # Compute Tmm
         # pc = 3.0857e18 cm
         # mJy = 1.e-26  erg /s/cm2/Hz
@@ -59,6 +52,42 @@ class Disk(object):
         self.tmm = self.tmm_fs[0]
         self.tmm_16 = self.tmm_fs_16[0]
         self.tmm_84 = self.tmm_fs_84[0]
+
+    def read_marco_fit_params(self):
+        self.rout = self.tabrow['R_out_50']
+        self.rout_16 = self.tabrow['R_out_16']
+        self.rout_84 = self.tabrow['R_out_84']
+        self.mdust = self.tabrow['M_dust_50']
+        self.mdust_16 = self.tabrow['M_dust_16']
+        self.mdust_84 = self.tabrow['M_dust_84']
+        self.gamma = self.tabrow['gamma_50']
+        self.gamma_16 = self.tabrow['gamma_16']
+        self.gamma_84 = self.tabrow['gamma_84']
+        self.rc = self.tabrow['Rc_50']
+        self.rc_16 = self.tabrow['Rc_16']
+        self.rc_84 = self.tabrow['Rc_84']
+        self.sigma0 = self.tabrow['sigma0_50']
+        self.sigma0_16 = self.tabrow['sigma0_16']
+        self.sigma0_84 = self.tabrow['sigma0_84']
+        self.inc = self.tabrow['inc_50']
+        self.inc_16 = self.tabrow['inc_16']
+        self.inc_84 = self.tabrow['inc_84']
+        if self.tabrow['Valid'] == 1:
+            self.valid = True 
+        else:
+            self.valid = False        
+
+    def read_lupus_ansdell_pars(self):
+        self.i = self.tabrow['i']
+        self.ei = self.tabrow['e_i']
+        self.a = self.tabrow['a']
+        self.ea = self.tabrow['e_a']
+        self.mdust_ansdell = self.tabrow['M_dust']
+
+    def read_bds_pars(self):
+        self.a = self.tabrow['a']
+        self.ea = self.tabrow['e_a']
+        self.mdust_testi = self.tabrow['M_dust']
 
     def _my_p_fac(self,x):
         # planck factor
@@ -97,12 +126,12 @@ class Disk(object):
 # classe che definisce il sample di stelle
 class DiskSample(object):
     
-    def __init__(self, tabfile):
+    def __init__(self, tabfile, tab_fmt='lupus'):
         #
         self.original_file = tabfile
-        self.mytable = aio.read(tabfile)
+        self.mytable = aio.read(tabfile,format='ipac',guess=False)
         self.stars = []
-        [self.stars.append(Disk(row)) for row in self.mytable]
+        [self.stars.append(Disk(row,tab_fmt=tab_fmt)) for row in self.mytable]
         self.nstars = len(self.stars)
         self.fill_err_cols()
         self.fill_tmm_cols()
@@ -169,42 +198,81 @@ class DiskSample(object):
         self.mytable['Tlt'] = tmed*(self.mytable['Lstar']/self.mytable['Mstar'])**0.25 * u.K
 
     #
+    # Computes the Tlt_Ruvg temperature
+    def calc_tlt_uvg(self,tmed,amin):
+        # amin is in arcsec
+        #
+        self.mytable['Tlt_uvg'] = self.mytable['Tmm_50']
+        for i in range(len(self.mytable['Lstar'])):
+            if self.mytable['a'][i] != '...':
+                #print('{0}, {1}, {2}, {3}'.format(tmed,self.mytable['Lstar'][i],float(self.mytable['a'][i]),self.mytable['Dist'][i]))
+                #print('{0} = {1}'.format(self.mytable['Tlt_uvg'][i],tmed*(self.mytable['Lstar'][i])**0.25/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5 * u.K))
+                self.mytable['Tlt_uvg'][i] = tmed*(self.mytable['Lstar'][i])**0.25/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5 #* u.K
+            else:
+                self.mytable['Tlt_uvg'][i] = tmed*(self.mytable['Lstar'][i])**0.25/(amin*self.mytable['Dist'][i])**0.5 #* u.K
+        self.mytable['Tlt_uvg'] = self.mytable['Tlt_uvg'] * u.K
+
+    #
+    # Computes the Tlt_LaM temperature
+    def calc_tlt_lam(self,tmed,amin):
+        # amin is in arcsec
+        #
+        self.mytable['Tlt_lam'] = self.mytable['Tmm_50']
+        for i in range(len(self.mytable['Lstar'])):
+            if self.mytable['a'][i] != '...':
+                #print('{0}, {1}, {2}, {3}'.format(tmed,self.mytable['Lstar'][i],float(self.mytable['a'][i]),self.mytable['Dist'][i]))
+                #print('{0} = {1}'.format(self.mytable['Tlt_uvg'][i],tmed*(self.mytable['Lstar'][i])**0.25/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5 * u.K))
+                self.mytable['Tlt_lam'][i] = tmed*(self.mytable['Lstar'][i]/self.mytable['Mstar'][i])**0.25/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5 #* u.K
+            else:
+                self.mytable['Tlt_lam'][i] = tmed*(self.mytable['Lstar'][i]/self.mytable['Mstar'][i])**0.25/(amin*self.mytable['Dist'][i])**0.5 #* u.K
+        self.mytable['Tlt_lam'] = self.mytable['Tlt_lam'] * u.K
+
+    #
     # Computes the Tlt temperature
     def calc_ta(self):
         #
         self.mytable['Ta'] = 25.*(self.mytable['Lstar'])**0.25 * u.K
         self.mytable['Tvdp'] = 22.*(self.mytable['Lstar'])**0.16 * u.K
 
-    #
-    # Computes the md (and uncertainties) using the Tlt, Ta temperatures 
-    def calc_md_tlt(self, nu = 340.*u.GHz, k340 = 3.4):
-        self.boltz_tlt = np.ones(self.nstars)
-        self.boltz_ta = np.ones(self.nstars)
-        self.boltz_tvdp = np.ones(self.nstars)
-        for i in range(self.nstars):
-            self.boltz_tlt[i] = blackbody_nu(nu, self.mytable[i]['Tlt']).value
-            self.boltz_ta[i] = blackbody_nu(nu, self.mytable[i]['Ta']).value
-            self.boltz_tvdp[i] = blackbody_nu(nu, self.mytable[i]['Tvdp']).value
-        self.boltz_20k = blackbody_nu(nu, 20. * u.K).value
+    def get_mass(self,bfac):
         # pc = 3.0857e18 cm
         # mJy = 1.e-26  erg /s/cm2/Hz
         # mE = 5.9722e27 g
         # k340 =3.4
         # k = mJy*pc*pc/mE = 1.594311e-17
-        mfunc_k = 1.594311e-17/k340
-        self.mlt = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt
-        self.mlt_ep = mfunc_k * (self.mytable['F_cont'] + self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt - self.mlt
-        self.mlt_em = self.mlt - mfunc_k * (self.mytable['F_cont'] - self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tlt
-        self.mta = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta
-        self.mta_ep = mfunc_k * (self.mytable['F_cont'] + self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta + self.mta
-        self.mta_em = self.mta - mfunc_k * (self.mytable['F_cont'] - self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_ta
-        self.mtvdp = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_tvdp
-        self.m20k = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k
-        self.m20k_ep = mfunc_k * (self.mytable['F_cont'] + self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k + self.m20k
-        self.m20k_em = self.m20k - mfunc_k * (self.mytable['F_cont'] - self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / self.boltz_20k
+        mfunc_k = 1.594311e-17/self.k340
+        m = mfunc_k * self.mytable['F_cont'] * self.mytable['Dist'] * self.mytable['Dist'] / bfac
+        m_ep = mfunc_k * (self.mytable['F_cont']+self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / bfac - m
+        m_em = m - mfunc_k * (self.mytable['F_cont']-self.mytable['E_cont']) * self.mytable['Dist'] * self.mytable['Dist'] / bfac
+        return m, m_ep, m_em
+
+    #
+    # Computes the md (and uncertainties) using the Tlt, Ta temperatures 
+    def calc_md_tlt(self, nu = 340.*u.GHz, k340 = 3.37):
+        self.k340 = k340
+        self.boltz_tlt = np.ones(self.nstars)
+        self.boltz_tlt_uvg = np.ones(self.nstars)
+        self.boltz_tlt_lam = np.ones(self.nstars)
+        self.boltz_ta = np.ones(self.nstars)
+        self.boltz_tvdp = np.ones(self.nstars)
+        for i in range(self.nstars):
+            self.boltz_tlt[i] = blackbody_nu(nu, self.mytable[i]['Tlt']).value
+            self.boltz_tlt_uvg[i] = blackbody_nu(nu, self.mytable[i]['Tlt_uvg']).value
+            self.boltz_tlt_lam[i] = blackbody_nu(nu, self.mytable[i]['Tlt_lam']).value
+            self.boltz_ta[i] = blackbody_nu(nu, self.mytable[i]['Ta']).value
+            self.boltz_tvdp[i] = blackbody_nu(nu, self.mytable[i]['Tvdp']).value
+        self.boltz_20k = np.zeros(self.nstars)+blackbody_nu(nu, 20. * u.K).value
+        
+        #
+        self.mlt, self.mlt_ep, self.mlt_em = self.get_mass(self.boltz_tlt)
+        self.mlt_uvg, self.mlt_uvg_ep, self.mlt_uvg_em = self.get_mass(self.boltz_tlt_uvg)
+        self.mlt_lam, self.mlt_lam_ep, self.mlt_lam_em = self.get_mass(self.boltz_tlt_lam)
+        self.mta, self.mta_ep, self.mta_em = self.get_mass(self.boltz_ta)
+        self.mtvdp, self.mtvdp_ep, self.mtvdp_em = self.get_mass(self.boltz_tvdp)
+        self.m20k, self.m20k_ep, self.m20k_em = self.get_mass(self.boltz_20k)
 
     def do_LM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
-                   fsiz=(8,6), f='None', myyrange=[2.,1000.], myxrange=[0.03,4.]):
+                   fsiz=(8,6), f='None', myyrange=[2.,1000.], myxrange=[0.03,4.], dolabel=True):
         marksiz=mymarksiz
         elsiz=myelsiz
         if newfig:
@@ -221,12 +289,13 @@ class DiskSample(object):
              mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
 
         # compute median, plot and annotate
-        mymed = np.median(self.mytable[self.nval]['Tmm_50']/myxlm[self.nval])
-        plt.plot(myxrange,[mymed,mymed],linestyle='dashed',color=mycolor)
+        self.Tlt = np.median(self.mytable[self.nval]['Tmm_50']/myxlm[self.nval])
+        plt.plot(myxrange,[self.Tlt,self.Tlt],linestyle='dashed',color=mycolor)
         xl = myxrange[0]+(myxrange[1]-myxrange[0])*0.005
         yl = myyrange[1]-(myyrange[1]-myyrange[0])*0.2
-        mylab = "Median = %5.2f" % (mymed)
-        plt.text(xl,yl,mylab)
+        mylab = "Median = %5.2f" % (self.Tlt)
+        if dolabel:
+            plt.text(xl,yl,mylab)
         
         # Y-axis
         plt.xscale('log')
@@ -259,6 +328,96 @@ class DiskSample(object):
         else:
             return 0
 
+    def do_LaMM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(8,6), ax='None', myyrange=[10.,300.], myxrange=[0.03,4.], dolabel=True):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f = plt.figure(figsize=fsiz)
+
+        myxra = np.copy(self.mytable['Lstar']**0.25)
+        for i in range(len(myxra)):
+            if self.mytable['a'][i]!='...':
+                myxra[i] = myxra[i]/self.mytable['Mstar'][i]**0.25/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5
+            else:
+                myxra[i] = 1.e5
+
+        ngra = np.where(myxra[self.nval] < 1.e5)
+        self.Tlt_ruvg = np.median((self.mytable[self.nval]['Tmm_50']/myxra[self.nval])[ngra])
+
+        # Plot for Rout
+        plt.errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Tmm_50']/myxra[self.nval],
+             yerr=[self.mytable[self.nval]['Tmm_em']/myxra[self.nval],self.mytable[self.nval]['Tmm_ep']/myxra[self.nval]], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Tmm_50']/myxra[self.ninval],
+             yerr=[self.mytable[self.ninval]['Tmm_em']/myxra[self.ninval],self.mytable[self.ninval]['Tmm_ep']/myxra[self.ninval]], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.plot([myxrange[0],myxrange[1]],[self.Tlt_ruvg,self.Tlt_ruvg],linestyle='dotted',color='k')
+        mylab = "Median = %5.2f" % (self.Tlt_ruvg)
+        xl = myxrange[0]+(myxrange[1]-myxrange[0])*0.005
+        yl = myyrange[0]+(myyrange[1]-myyrange[0])*0.01
+        if dolabel:
+            plt.text(xl,yl,mylab)
+        # Y-axis
+        plt.xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        plt.xlabel(r'M$_\star$/M$_\odot$')
+        plt.xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        plt.ylabel(r'(T$_{mm}$/K)/(((L$_\star$/L$_\odot$)/(M$_\star$/M$_\odot$))$^{0.25}/$(R$_{uvg}$/AU)$^{0.5}$)')
+        plt.yscale('log')
+        plt.ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f 
+        else:
+            return 0
+
+    def do_aM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(8,6), ax='None', myyrange=[10.,300.], myxrange=[0.03,4.], dolabel=True):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f = plt.figure(figsize=fsiz)
+
+        myxra = np.copy(self.mytable['Lstar']**0.25)
+        for i in range(len(myxra)):
+            if self.mytable['a'][i]!='...':
+                myxra[i] = myxra[i]/(float(self.mytable['a'][i])*self.mytable['Dist'][i])**0.5
+            else:
+                myxra[i] = 1.e5
+
+        ngra = np.where(myxra[self.nval] < 1.e5)
+        self.Tlt_ruvg = np.median((self.mytable[self.nval]['Tmm_50']/myxra[self.nval])[ngra])
+
+        # Plot for Rout
+        plt.errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['Tmm_50']/myxra[self.nval],
+             yerr=[self.mytable[self.nval]['Tmm_em']/myxra[self.nval],self.mytable[self.nval]['Tmm_ep']/myxra[self.nval]], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.errorbar(self.mytable[self.ninval]['Mstar'],self.mytable[self.ninval]['Tmm_50']/myxra[self.ninval],
+             yerr=[self.mytable[self.ninval]['Tmm_em']/myxra[self.ninval],self.mytable[self.ninval]['Tmm_ep']/myxra[self.ninval]], 
+             mfc='none', fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        plt.plot([myxrange[0],myxrange[1]],[self.Tlt_ruvg,self.Tlt_ruvg],linestyle='dotted',color='k')
+        mylab = "Median = %5.2f" % (self.Tlt_ruvg)
+        xl = myxrange[0]+(myxrange[1]-myxrange[0])*0.005
+        yl = myyrange[0]+(myyrange[1]-myyrange[0])*0.01
+        if dolabel:
+            plt.text(xl,yl,mylab)
+        # Y-axis
+        plt.xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        plt.xlabel(r'M$_\star$/M$_\odot$')
+        plt.xlim(myxrange[0],myxrange[1])
+        # Y-axis
+        plt.ylabel(r'(T$_{mm}$/K)/((L$_\star$/L$_\odot$)$^{0.25}/$(R$_{uvg}$/AU)$^{0.5}$)')
+        plt.yscale('log')
+        plt.ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f 
+        else:
+            return 0
+
     def do_RM_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
                    fsiz=(15,5), ax='None', myyrange=[2.,1000.], myxrange=[0.03,4.]):
         marksiz=mymarksiz
@@ -266,8 +425,7 @@ class DiskSample(object):
         if newfig:
             f, ax = plt.subplots(1, 2, figsize=fsiz)
 
-        #myxrout = self.mytable['Lstar']**0.25/self.mytable['R_out_50']**0.5
-        #myxrc = self.mytable['Lstar']**0.25/self.mytable['Rc_50']**0.5
+        
 
         # Plot for Rout
         ax[0].errorbar(self.mytable[self.nval]['Mstar'],self.mytable[self.nval]['R_out_50']/self.mytable[self.nval]['Mstar']**0.5,
