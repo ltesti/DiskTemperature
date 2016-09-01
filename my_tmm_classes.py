@@ -559,7 +559,7 @@ class DiskSample(object):
         else:
             return 0
         
-    def do_6_par_plot(self, ax='None', newfig=True, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, 
+    def do_6_par_plot(self, ax='None', newfig=True, plot_tmm_recipes=False, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, 
                       mytrange=[6.,200.], mygrange=[-1.8,2.], mylrange=[0.006,110.], mymsrange=[0.05,4.],
                       mymdrange=[1.,1000], myroutrange=[2.,600.], myrcrange=[1.,90.]):
         marksiz=mymarksiz
@@ -570,6 +570,16 @@ class DiskSample(object):
             fig, ax = plt.subplots(ny, nx, sharex=False, sharey=False, squeeze=True, figsize=(8*nx,8*ny))
 
         # Plot Tmm vs Lstar
+        # plot temperature recipes
+        if plot_tmm_recipes:
+            lls_rec = np.linspace(-3,4,100)
+            ls_rec = 10**lls_rec
+            myta = 25.*(ls_rec)**0.25
+            mytvp = 22.*(ls_rec)**0.16 
+            ax[0][0].plot([-3,5],[20.,20.],color='red',linestyle='dotted')
+            ax[0][0].plot(ls_rec,myta,color='red',linestyle='solid')
+            ax[0][0].plot(ls_rec,mytvp,color='red',linestyle='dashed')
+        # plot data
         ax[0][0].errorbar((self.mytable[self.nval]['Lstar']),self.mytable[self.nval]['Tmm_50'],
              yerr=[self.mytable[self.nval]['Tmm_em'],self.mytable[self.nval]['Tmm_ep']], 
              fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
