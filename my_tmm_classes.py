@@ -511,6 +511,58 @@ class DiskSample(object):
         else:
             return 0
 
+    def do_RR_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
+                   fsiz=(15,5), ax='None', myyrange=[2.,1000.], myxrange1=[0.03,4.], myxrange2=[0.03,4.]):
+        marksiz=mymarksiz
+        elsiz=myelsiz
+        if newfig:
+            f, ax = plt.subplots(1, 2, figsize=fsiz)
+
+        myxra = np.zeros(len(self.mytable['a']))
+        for i in range(len(myxra)):
+            if self.mytable['a'][i]!='...':
+                myxra[i] = float(self.mytable['a'][i])*self.mytable['Dist'][i]
+            else:
+                myxra[i] = 1.e5
+
+        ngra = np.where(myxra[self.nval] < 1.e5)
+
+        # Plot Ruvg vs Rout
+        ax[0].errorbar(self.mytable[ngra]['R_out_50'],myxra[ngra],
+             yerr=[self.mytable[ngra]['e_a']*self.mytable['Dist'][i],self.mytable[ngra]['e_a']*self.mytable['Dist'][i]], 
+             xerr=[self.mytable[ngra]['R_out_16'],self.mytable[ngra]['R_out_84']], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        ax[0].set_xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        ax[0].set_xlabel(r'R$_{out}$/AU')
+        ax[0].set_xlim(myxrange1[0],myxrange1[1])
+        # Y-axis
+        ax[0].set_ylabel(r'(R$_{uvg}$/AU)')
+        ax[0].set_yscale('log')
+        ax[0].set_ylim(myyrange[0],myyrange[1])
+
+        # Plot for Rc
+        # Plot Ruvg vs Rout
+        ax[1].errorbar(self.mytable[ngra]['Rc_50'],myxra[ngra],
+             yerr=[self.mytable[ngra]['e_a']*self.mytable['Dist'][i],self.mytable[ngra]['e_a']*self.mytable['Dist'][i]], 
+             xerr=[self.mytable[ngra]['Rc_16'],self.mytable[ngra]['Rc_84']], 
+             fmt=mysymbol,color=mycolor, markersize=marksiz, elinewidth=elsiz)
+        # Y-axis
+        ax[1].set_xscale('log')
+        #ax[0].set_xlabel(r'(L$_\star$/L$_\odot$)$^{0.25}/$(R$_{out}$/AU)$^{0.5}$')
+        ax[1].set_xlabel(r'R$_{c}$/AU')
+        ax[1].set_xlim(myxrange2[0],myxrange2[1])
+        # Y-axis
+        ax[1].set_ylabel(r'(R$_{uvg}$/AU)')
+        ax[1].set_yscale('log')
+        ax[1].set_ylim(myyrange[0],myyrange[1])
+
+        if newfig:
+            return f, ax 
+        else:
+            return 0
+
     def do_LR_plot(self, mycolor='blue', mysymbol='o', mymarksiz=18, myelsiz=3, newfig=True, 
                    fsiz=(15,5), ax='None', myyrange=[12.,1000.], myxrange=[0.03,4.]):
         marksiz=mymarksiz
